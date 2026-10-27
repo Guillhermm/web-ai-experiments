@@ -1,0 +1,151 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Poppins', sans-serif;
+  background: #1e1e1e;
+  color: #fff;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+header {
+  text-align: center;
+  padding: 2rem 1rem 1rem;
+}
+
+header h1 {
+  font-size: 2.5rem;
+  line-height: 1.1;
+  margin-bottom: .5rem;
+  color: #14b8a6;
+}
+
+header p {
+  font-size: 1.1rem;
+  color: #ccc;
+}
+
+main {
+  flex-grow: 1;
+}
+
+.grid-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16.25rem, 1fr));
+  gap: 1.5rem;
+  padding: 1rem;
+}
+
+.card {
+  background: #303030;
+  border-radius: .75rem;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 .3rem 1rem rgba(0, 0, 0, .5);
+  transition: transform .3s, box-shadow .3s;
+}
+
+.card:hover {
+  transform: translateY(-.3rem);
+  box-shadow: 0 .6rem 1.25rem rgba(0, 0, 0, .7);
+}
+
+.card img {
+  width: 100%;
+  display: block;
+  object-fit: cover;
+  aspect-ratio: 4 / 3;
+}
+
+.card h2 {
+  font-size: 1.4rem;
+  margin: .75rem 1rem .25rem 1rem;
+}
+
+.card p {
+  flex-grow: 1;
+  font-size: .95rem;
+  color: #aaa;
+  margin: 0 1rem 1rem 1rem;
+}
+
+.links {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.links a {
+  text-decoration: none;
+  color: #fff;
+  background: #0f766e;
+  padding: .5rem 1rem;
+  border-radius: .4rem;
+  font-size: .9rem;
+  font-weight: 600;
+  text-align: center;
+  text-transform: uppercase;
+  transition: all .2s ease-in-out;
+  width: 100%;
+}
+
+.links a:hover {
+  background: #115e59;
+}
+
+footer {
+  text-align: center;
+  padding: 1.5rem 1rem;
+  font-size: .9rem;
+  color: #777;
+}
+
+footer .social {
+  margin-top: .5rem;
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+}
+
+footer .social a {
+  text-decoration: none;
+  color: #14b8a6;
+  transition: all .3s ease;
+}
+
+footer .social a:hover {
+  color: #5eead4;
+}
+
+@media (min-width: 48rem) {
+  header {
+    padding: 2rem 1rem;
+  }
+
+  .grid-container {
+    padding: 2rem;
+  }
+}
+
+@media (min-width: 64rem) {
+  .container {
+    max-width: 60rem;
+    margin: 0 auto;
+  }
+}
+
+@media (min-width: 90rem) {
+  .container {
+    max-width: 80rem;
+    margin: 0 auto;
+  }
+}
