@@ -12,7 +12,6 @@ const DEPTH = 6.5;
 const G = 520;
 const MAX_BODIES = 8;
 const MASS_MIN = 0.2;
-const MESH_N = 400;
 const SHEET_BAND = 8;
 const WAVE_N = 192;
 const WAVE_CELL = (2 * HALF) / WAVE_N;
@@ -116,6 +115,27 @@ const farFieldLevel = (bodies) => {
 		sum += wellHeight(bodies, Math.cos(a) * HALF, Math.sin(a) * HALF);
 	}
 	return sum / 16;
+};
+
+// Render quality, from full down. Phones with weak GPUs step down one tier at a time while
+// frames stay slow. Tier 0 is what every capable device gets.
+const QUALITY_TIERS = [
+	{ dpr: 1.75, msaa: 4, mesh: 400 },
+	{ dpr: 1.75, msaa: 0, mesh: 400 },
+	{ dpr: 1.4, msaa: 0, mesh: 280 },
+	{ dpr: 1.1, msaa: 0, mesh: 200 },
+	{ dpr: 0.85, msaa: 0, mesh: 160 },
+];
+const SLOW_FRAME_MS = 1000 / 45;
+
+// Fed the median frame time of each sampling window. Steps down while frames are slow. If a
+// step brings no real gain, the display is capping the frame rate (a phone in power saving,
+// say), so it goes back up and stops for good: that device was never short of GPU.
+const adaptQuality = (state, medianMs) => {
+	if (state.settled) return state;
+	if (state.before !== undefined && medianMs > state.before * 0.9) return { tier: state.tier - 1, settled: true };
+	if (medianMs > SLOW_FRAME_MS && state.tier < QUALITY_TIERS.length - 1) return { tier: state.tier + 1, before: medianMs };
+	return { tier: state.tier };
 };
 
 const MOON_FADE_IN = 1.2;
@@ -807,29 +827,42 @@ const boot = () => {
 		return { vao, buf };
 	};
 
-	const sheetVerts = new Float32Array((MESH_N + 1) ** 2 * 2);
-	for (let j = 0, k = 0; j <= MESH_N; j++) {
-		for (let i = 0; i <= MESH_N; i++) {
-			sheetVerts[k++] = -EXTENT + (2 * EXTENT * i) / MESH_N;
-			sheetVerts[k++] = -EXTENT + (2 * EXTENT * j) / MESH_N;
+	let sheet = null;
+	const buildSheet = (n) => {
+		if (sheet) {
+			gl.deleteVertexArray(sheet.vao);
+			gl.deleteBuffer(sheet.buf);
+			gl.deleteBuffer(sheet.idx);
 		}
-	}
-	// The same quads twice: first in rows along z, then in columns along x, so the sheet can
-	// be drawn back to front from whichever side the camera is on.
-	const quadsPerLine = MESH_N * 6;
-	const sheetIdx = new Uint32Array(quadsPerLine * MESH_N * 2);
-	let written = 0;
-	const pushQuad = (i, j) => {
-		const a = j * (MESH_N + 1) + i;
-		const b = a + MESH_N + 1;
-		sheetIdx.set([a, b, a + 1, a + 1, b, b + 1], written);
-		written += 6;
+		const verts = new Float32Array((n + 1) ** 2 * 2);
+		for (let j = 0, k = 0; j <= n; j++) {
+			for (let i = 0; i <= n; i++) {
+				verts[k++] = -EXTENT + (2 * EXTENT * i) / n;
+				verts[k++] = -EXTENT + (2 * EXTENT * j) / n;
+			}
+		}
+		// The same quads twice: first in rows along z, then in columns along x, so the sheet can
+		// be drawn back to front from whichever side the camera is on.
+		const quadsPerLine = n * 6;
+		const indices = new Uint32Array(quadsPerLine * n * 2);
+		let written = 0;
+		const pushQuad = (i, j) => {
+			const a = j * (n + 1) + i;
+			const b = a + n + 1;
+			indices.set([a, b, a + 1, a + 1, b, b + 1], written);
+			written += 6;
+		};
+		for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) pushQuad(i, j);
+		for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) pushQuad(i, j);
+		const { vao, buf } = vertexArray(verts, 2);
+		const idx = gl.createBuffer();
+		gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, idx);
+		gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
+		gl.bindVertexArray(null);
+		sheet = { vao, buf, idx, n, quadsPerLine };
 	};
-	for (let j = 0; j < MESH_N; j++) for (let i = 0; i < MESH_N; i++) pushQuad(i, j);
-	for (let i = 0; i < MESH_N; i++) for (let j = 0; j < MESH_N; j++) pushQuad(i, j);
-	const sheet = vertexArray(sheetVerts, 2);
-	gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, gl.createBuffer());
-	gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, sheetIdx, gl.STATIC_DRAW);
+	let quality = { tier: 0 };
+	buildSheet(QUALITY_TIERS[0].mesh);
 
 	const quad = vertexArray(new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), 2);
 	const dustData = new Float32Array(DUST * 4);
@@ -878,7 +911,7 @@ const boot = () => {
 
 	const buildTargets = (w, h) => {
 		releaseTargets();
-		const samples = Math.min(4, gl.getParameter(gl.MAX_SAMPLES));
+		const samples = Math.min(QUALITY_TIERS[quality.tier].msaa, gl.getParameter(gl.MAX_SAMPLES));
 		const msaa = gl.createFramebuffer();
 		const color = gl.createRenderbuffer();
 		const depth = gl.createRenderbuffer();
@@ -901,11 +934,11 @@ const boot = () => {
 	const cam = { yaw: 0.6, pitch: 0.62, dist: 28, target: [0, -2.5, 0] };
 	const view = { eye: [0, 0, 0], viewProj: null, invViewProj: null, right: [1, 0, 0], up: [0, 1, 0], pixels: 1 };
 
-	const resize = () => {
-		const dpr = Math.min(window.devicePixelRatio || 1, 1.75);
+	const resize = (force = false) => {
+		const dpr = Math.min(window.devicePixelRatio || 1, QUALITY_TIERS[quality.tier].dpr);
 		const w = Math.max(1, Math.floor(canvas.clientWidth * dpr));
 		const h = Math.max(1, Math.floor(canvas.clientHeight * dpr));
-		if (targets && targets.w === w && targets.h === h) return;
+		if (!force && targets && targets.w === w && targets.h === h) return;
 		canvas.width = w;
 		canvas.height = h;
 		buildTargets(w, h);
@@ -1231,8 +1264,9 @@ const boot = () => {
 		gl.bindTexture(gl.TEXTURE_2D, waveTex);
 		gl.bindVertexArray(sheet.vao);
 		const order = sheetDrawOrder(view.eye, cam.target);
-		const base = order.axis === 'z' ? 0 : quadsPerLine * MESH_N;
-		const bands = MESH_N / SHEET_BAND;
+		const { n: meshN, quadsPerLine } = sheet;
+		const base = order.axis === 'z' ? 0 : quadsPerLine * meshN;
+		const bands = meshN / SHEET_BAND;
 		for (let n = 0; n < bands; n++) {
 			const band = order.ascending ? n : bands - 1 - n;
 			const first = base + band * SHEET_BAND * quadsPerLine;
@@ -1241,7 +1275,7 @@ const boot = () => {
 		// Depth only, after the color: dust, moons and trails behind a slope stay hidden.
 		gl.colorMask(false, false, false, false);
 		gl.depthMask(true);
-		gl.drawElements(gl.TRIANGLES, quadsPerLine * MESH_N, gl.UNSIGNED_INT, 0);
+		gl.drawElements(gl.TRIANGLES, quadsPerLine * meshN, gl.UNSIGNED_INT, 0);
 		gl.colorMask(true, true, true, true);
 
 		// Halos skip the depth test so their light spills over the rim of the well.
@@ -1555,7 +1589,7 @@ const boot = () => {
 		cam.dist = Math.min(80, Math.max(10, cam.dist * Math.exp(e.deltaY * 0.001)));
 	}, { passive: false });
 
-	addEventListener('resize', resize);
+	addEventListener('resize', () => resize());
 	resize();
 
 	// Two-body start: star and planet around their shared center of mass.
@@ -1569,10 +1603,33 @@ const boot = () => {
 	for (let k = 0; k < DUST * 4; k += 4) placeOrbiter(dust, k, ...DUST_SPREAD);
 	moons.forEach((m) => placeOrbiter(m.s, 0, 4, 7));
 
+	// Frame times are sampled after a short settling period, about two seconds' worth at a time,
+	// skipping gaps such as a hidden tab.
+	const frameTimes = [];
+	let sampledMs = 0;
+	let sampleFrom = performance.now() + 1500;
+	const watchFrameRate = (now, interval) => {
+		if (quality.settled || now < sampleFrom || interval > 1000) return;
+		frameTimes.push(interval);
+		sampledMs += interval;
+		if (frameTimes.length < 90 && (sampledMs < 2000 || frameTimes.length < 8)) return;
+		const median = frameTimes.sort((a, b) => a - b)[frameTimes.length >> 1];
+		sampledMs = 0;
+		frameTimes.length = 0;
+		const next = adaptQuality(quality, median);
+		const changed = next.tier !== quality.tier;
+		quality = next;
+		if (!changed) return;
+		buildSheet(QUALITY_TIERS[quality.tier].mesh);
+		resize(true);
+		sampleFrom = now + 1500;
+	};
+
 	let last = performance.now();
 	let time = 0;
 	const frame = (now) => {
 		const dt = Math.min(1 / 30, Math.max(0, (now - last) / 1000));
+		watchFrameRate(now, now - last);
 		last = now;
 		time += dt;
 		if (!calm && !drag && now - lastInput > 4000) cam.yaw += dt * 0.035;

@@ -16,7 +16,7 @@ Open `index.html` in a browser that supports WebGL 2.
 
 ## What is on screen
 
-- **The sheet**: a square 400 × 400 mesh that fades out toward its edges so it reads as endless.
+- **The sheet**: a square 400 × 400 mesh (smaller on slow devices, see Quality) that fades out toward its edges so it reads as endless.
   The fade is tuned to be nearly gone where the play area ends, so anywhere the grid shows, you
   can add or move a body. Its height, computed in the vertex shader, is the softened Newtonian
   potential of every body, drawn at one scale for every kind (so a black hole digs a deeper well
@@ -48,6 +48,12 @@ Open `index.html` in a browser that supports WebGL 2.
 - **Post-processing**: HDR render target with 4× MSAA, dual-filter bloom, ACES tone mapping,
   slight chromatic aberration, vignette and film grain. Falls back to 8-bit targets when the GPU
   cannot render to float textures.
+- **Quality**: devices that cannot keep up step down on their own, one tier at a time, while
+  frames stay under 45 per second: first MSAA goes off, then the render resolution and the sheet
+  mesh shrink (down to 0.85× pixels and a 160 × 160 mesh). It never steps back up. If a step
+  brings no gain, the display is capping the frame rate (a phone in power saving, say), so the
+  previous tier comes back and the scene stops adapting. Devices that keep up stay at full
+  quality: 1.75× pixels, 4× MSAA, a 400 × 400 mesh.
 - **Sky**: procedural stars and a nebula band, fixed in the world so they turn with the camera.
 
 ## How accurate is it
@@ -93,7 +99,7 @@ motion.
 ## Tests
 
 The CPU math (potential and its match to gravity, circular orbits, merging, waves, matrices, ray picking on the
-curved sheet, tap and double-tap detection) is tested with Node's built-in runner, no install needed:
+curved sheet, tap and double-tap detection, quality steps) is tested with Node's built-in runner, no install needed:
 
 ```sh
 node --test tests/math.test.mjs

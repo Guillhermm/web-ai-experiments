@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 const ctx = vm.createContext({});
 vm.runInContext(readFileSync(new URL('../script.js', import.meta.url), 'utf8'), ctx);
 const api = vm.runInContext(
-	`({ wellHeight, gravityAt, stepFade, MOON_FADE_IN, MOON_FADE_OUT, clampMass, farFieldLevel, KINDS, bounceInSquare, restingHeight, sheetDrawOrder, MESH_N, SHEET_BAND, circularSpeed, mergeBodies, stepWaves, sampleWave, perspective, lookAt,
+	`({ wellHeight, gravityAt, stepFade, MOON_FADE_IN, MOON_FADE_OUT, clampMass, farFieldLevel, KINDS, bounceInSquare, restingHeight, sheetDrawOrder, QUALITY_TIERS, SLOW_FRAME_MS, adaptQuality, SHEET_BAND, circularSpeed, mergeBodies, stepWaves, sampleWave, perspective, lookAt,
 		multiply, invert, transform, rayFromNdc, raySphere, rayPlaneY, pickSurface, isTap, isDoubleTap,
 		TAP_MS, DOUBLE_TAP_MS, DEPTH, HALF, WAVE_N, G, WELL_SCALE, HOLE_MERGER_LOSS })`,
 	ctx,
@@ -214,7 +214,7 @@ test('the sheet is walked from the side away from the camera', () => {
 });
 
 test('the sheet splits evenly into draw bands', () => {
-	assert.equal(api.MESH_N % api.SHEET_BAND, 0);
+	for (const t of api.QUALITY_TIERS) assert.equal(t.mesh % api.SHEET_BAND, 0, `mesh ${t.mesh}`);
 });
 
 test('each kind has its own mass cap, and black holes go highest', () => {
@@ -241,4 +241,45 @@ test('a moon fades in over MOON_FADE_IN and out over MOON_FADE_OUT, clamped', ()
 	assert.equal(api.stepFade(0.9, false, 10), 1);
 	close(api.stepFade(1, true, api.MOON_FADE_OUT / 2), 0.5);
 	assert.equal(api.stepFade(0.1, true, 10), 0);
+});
+
+test('full quality is what the scene always had: 1.75x pixels, 4x MSAA, a 400 mesh', () => {
+	assert.deepEqual({ ...api.QUALITY_TIERS[0] }, { dpr: 1.75, msaa: 4, mesh: 400 });
+	for (let i = 1; i < api.QUALITY_TIERS.length; i++) {
+		const [a, b] = [api.QUALITY_TIERS[i - 1], api.QUALITY_TIERS[i]];
+		assert.ok(b.dpr <= a.dpr && b.msaa <= a.msaa && b.mesh <= a.mesh, `tier ${i} is not cheaper`);
+	}
+});
+
+test('quality stays put while frames are fast', () => {
+	let q = { tier: 0 };
+	for (const ms of [16.7, 8.3, 20, api.SLOW_FRAME_MS]) q = api.adaptQuality(q, ms);
+	assert.equal(q.tier, 0);
+	assert.ok(!q.settled);
+});
+
+test('quality steps down while frames are slow and the steps help', () => {
+	let q = { tier: 0 };
+	for (const ms of [70, 45, 30, 24]) q = api.adaptQuality(q, ms);
+	assert.equal(q.tier, 4);
+	q = api.adaptQuality(q, 20);
+	q = api.adaptQuality(q, 40);
+	assert.equal(q.tier, 4, 'no tier below the last');
+	assert.ok(!q.settled);
+});
+
+test('a display capped at 30 fps gets its quality back and is left alone', () => {
+	let q = api.adaptQuality({ tier: 0 }, 33.3);
+	assert.equal(q.tier, 1);
+	q = api.adaptQuality(q, 33.3);
+	assert.deepEqual({ ...q }, { tier: 0, settled: true });
+	assert.equal(api.adaptQuality(q, 60).tier, 0);
+});
+
+test('a step that helps, then fast frames, keeps the lower tier and keeps watching', () => {
+	let q = api.adaptQuality({ tier: 0 }, 40);
+	q = api.adaptQuality(q, 16.7);
+	assert.equal(q.tier, 1);
+	assert.ok(!q.settled);
+	assert.equal(api.adaptQuality(q, 16.7).tier, 1);
 });
