@@ -17,7 +17,13 @@ const SHEET_BAND = 8;
 const WAVE_N = 192;
 const WAVE_CELL = (2 * HALF) / WAVE_N;
 const WAVE_C2 = 0.22;
-const WAVE_DAMP = 0.986;
+// Steps per second. Ripples travel sqrt(WAVE_C2) cells per step, about 28 world units/s,
+// faster than stars and planets orbit. Anything orbiting close to a heavy black hole, and
+// thrown bodies, can still outrun them.
+const WAVE_RATE = 240;
+const WAVE_DAMP = 0.993;
+// Faster ripples spread over a wider ring, so disturbances push harder to stay as visible.
+const KICK_GAIN = 1.6;
 const SHADE_REF = DEPTH * 1.9;
 const DUST = 1800;
 const DUST_SPREAD = [2.2, 12];
@@ -35,14 +41,18 @@ const KINDS = {
 	hole: { soften: 1.25, maxMass: 10, radius: (m) => 0.3 + 0.22 * Math.sqrt(m) },
 };
 
-// The sheet is the softened Newtonian potential, so everything that orbits is
-// pulled by exactly the slope that is drawn.
+// The sheet is the softened Newtonian potential -G m / sqrt(r^2 + s^2) drawn at one scale for
+// every kind, so everything that orbits is pulled by exactly the slope that is drawn, and a
+// compact body (smaller s) digs a deeper well than a star of the same mass. A star's well is
+// DEPTH * mass deep.
+const WELL_SCALE = DEPTH * KINDS.star.soften;
+
 const wellHeight = (bodies, x, z) => {
 	let h = 0;
 	for (const b of bodies) {
 		const dx = x - b.x;
 		const dz = z - b.z;
-		h -= (DEPTH * b.mass) / Math.sqrt(1 + (dx * dx + dz * dz) / (b.soften * b.soften));
+		h -= (WELL_SCALE * b.mass) / Math.sqrt(dx * dx + dz * dz + b.soften * b.soften);
 	}
 	return h;
 };
@@ -117,15 +127,19 @@ const stepFade = (fade, leaving, dt) =>
 
 const clampMass = (kind, mass) => Math.min(KINDS[kind].maxMass, Math.max(MASS_MIN, mass));
 
+// Two black holes radiate about 5% of their mass away as gravitational waves when they merge.
+const HOLE_MERGER_LOSS = 0.05;
+
 const mergeBodies = (a, b) => {
-	const mass = a.mass + b.mass;
+	const sum = a.mass + b.mass;
+	const mass = a.kind === 'hole' && b.kind === 'hole' ? sum * (1 - HOLE_MERGER_LOSS) : sum;
 	const heavy = a.mass >= b.mass ? a : b;
 	const kind = a.kind === 'hole' || b.kind === 'hole' ? 'hole' : a.kind === 'star' || b.kind === 'star' ? 'star' : 'planet';
 	return {
-		x: (a.x * a.mass + b.x * b.mass) / mass,
-		z: (a.z * a.mass + b.z * b.mass) / mass,
-		vx: (a.vx * a.mass + b.vx * b.mass) / mass,
-		vz: (a.vz * a.mass + b.vz * b.mass) / mass,
+		x: (a.x * a.mass + b.x * b.mass) / sum,
+		z: (a.z * a.mass + b.z * b.mass) / sum,
+		vx: (a.vx * a.mass + b.vx * b.mass) / sum,
+		vz: (a.vz * a.mass + b.vz * b.mass) / sum,
 		mass,
 		kind,
 		hue: heavy.hue,
@@ -309,6 +323,7 @@ const GLSL_HEAD = `#version 300 es
 precision highp float;
 precision highp int;
 const float DEPTH = ${DEPTH.toFixed(4)};
+const float WELL_SCALE = ${WELL_SCALE.toFixed(4)};
 const float HALF = ${HALF.toFixed(4)};
 const float FADE_START = ${FADE_START.toFixed(4)};
 const float FADE_END = ${FADE_END.toFixed(4)};
@@ -424,7 +439,7 @@ float well(vec2 p) {
 		if (i >= uCount) break;
 		vec4 b = uBodies[i];
 		vec2 d = p - b.xy;
-		h -= DEPTH * b.z * inversesqrt(1.0 + dot(d, d) / (b.w * b.w));
+		h -= WELL_SCALE * b.z * inversesqrt(dot(d, d) + b.w * b.w);
 	}
 	return h;
 }
@@ -573,15 +588,21 @@ void main() {
 		float ring = exp(-pow((q - 1.45) * 5.0, 2.0));
 		col = (vec3(1.0, 0.72, 0.42) * ring * 3.5 + vec3(0.55, 0.3, 1.0) * exp(-max(q - 1.0, 0.0) * 1.2) * 0.25) * fadeOut;
 	} else {
-		float inner = 1.6;
-		if (q < inner * 0.85 || q > uRatio) discard;
+		// Radii are in units of the drawn horizon. The disk stops at the innermost stable
+		// circular orbit, 3 horizon radii. Brightness scales as g^3, where g is the Doppler and
+		// gravitational shift of a circular orbit: sqrt(1 - 1.5 / q) / (1 - beta cos), with orbital
+		// speed beta = sqrt(0.5 / (q - 1)). The approaching side shines, the receding side fades.
+		float inner = 3.0;
+		if (q < inner || q > uRatio) discard;
 		float ang = atan(vCorner.y, vCorner.x);
 		float spin = ang - uTime * 3.0 / pow(q, 1.5);
 		vec2 pr = vec2(cos(spin), sin(spin)) * q;
 		float n = fbm(vec3(pr * 1.4, q * 2.5));
-		float profile = smoothstep(inner * 0.85, inner * 1.25, q) * exp(-(q - inner) * 0.42) * fadeOut;
+		float profile = smoothstep(inner, inner * 1.12, q) * exp(-(q - inner) * 0.42) * fadeOut;
 		vec3 tangent = vec3(-sin(ang), 0.0, cos(ang));
-		float doppler = 1.0 + 0.75 * dot(tangent, normalize(uEye - vPos));
+		float beta = sqrt(0.5 / (q - 1.0));
+		float g = sqrt(max(1.0 - 1.5 / q, 0.0)) / (1.0 - beta * dot(tangent, normalize(uEye - vPos)));
+		float doppler = pow(g, 3.0) / pow(1.0 - 1.5 / inner, 1.5);
 		vec3 hot = mix(vec3(1.0, 0.45, 0.15), vec3(1.0, 0.92, 0.82), exp(-(q - inner) * 0.55));
 		col = hot * profile * (0.25 + 1.8 * n * n) * doppler * 1.4;
 	}
@@ -676,7 +697,9 @@ void main() {
 }`;
 
 // Black holes bend the finished frame: a pixel at distance r from the hole shows
-// what sits at r - E^2 / r, the point-lens equation, which draws the Einstein ring.
+// what sits at r - E^2 / r, the point-lens equation. Within the shadow radius, sqrt(27) / 2 = 2.6
+// horizon radii, the frame is black. The mask cannot tell what is in front of the hole, so it
+// hides that too.
 const COMPOSITE_FS = `${GLSL_HEAD}${GLSL_NOISE}
 in vec2 vUv;
 uniform sampler2D uScene;
@@ -694,17 +717,19 @@ vec3 aces(vec3 x) {
 
 void main() {
 	vec2 px = vUv * uRes;
+	float shadow = 1.0;
 	for (int i = 0; i < 4; i++) {
 		if (i >= uLensCount) break;
 		vec2 d = px - uLens[i].xy;
 		float r = max(length(d), 1e-3);
+		shadow *= smoothstep(uLens[i].w * 2.45, uLens[i].w * 2.6, r);
 		px = uLens[i].xy + d / r * (r - uLens[i].z / r);
 	}
 	vec2 uv = clamp(px / uRes, 0.0, 1.0);
 	vec2 cd = vUv - 0.5;
 	vec2 ca = cd * dot(cd, cd) * 0.006;
 	vec3 col = vec3(texture(uScene, uv + ca).r, texture(uScene, uv).g, texture(uScene, uv - ca).b);
-	col += texture(uBloom, uv).rgb * uBloomGain;
+	col = (col + texture(uBloom, uv).rgb * uBloomGain) * shadow;
 	col = aces(col * 1.05);
 	float vig = 1.0 - smoothstep(0.35, 1.15, length(cd * vec2(uRes.x / uRes.y, 1.0)) * 0.95);
 	col *= mix(0.5, 1.0, vig);
@@ -946,7 +971,7 @@ const boot = () => {
 				if (i < 1 || j < 1 || i >= WAVE_N - 1 || j >= WAVE_N - 1) continue;
 				const wx = -HALF + (i + 0.5) * WAVE_CELL - x;
 				const wz = -HALF + (j + 0.5) * WAVE_CELL - z;
-				waveV[j * WAVE_N + i] += amount * Math.exp(-(wx * wx + wz * wz) / 0.35);
+				waveV[j * WAVE_N + i] += amount * KICK_GAIN * Math.exp(-(wx * wx + wz * wz) / 0.35);
 			}
 		}
 	};
@@ -1007,6 +1032,7 @@ const boot = () => {
 	};
 
 	let drag = null;
+	let waveClock = 0;
 
 	const simulate = (dt) => {
 		for (const b of bodies) {
@@ -1039,7 +1065,7 @@ const boot = () => {
 			b.vx += (vx - b.vx) * 0.5;
 			b.vz += (vz - b.vz) * 0.5;
 			const speed = Math.hypot(vx, vz);
-			if (speed > 1) kick(b.x, b.z, -0.0035 * Math.min(speed, 40) * b.mass);
+			if (speed > 1) kick(b.x, b.z, -0.21 * dt * Math.min(speed, 40) * b.mass);
 		}
 
 		for (let i = 0; i < bodies.length; i++) {
@@ -1062,10 +1088,10 @@ const boot = () => {
 
 		for (const b of bodies) {
 			const a = Math.hypot(b.ax, b.az);
-			if (a > 0.5) kick(b.x, b.z, -0.00028 * b.mass * Math.min(a, 60));
+			if (a > 0.5) kick(b.x, b.z, -0.0168 * dt * b.mass * Math.min(a, 60));
 		}
-		stepWaves(waveH, waveV, WAVE_N);
-		stepWaves(waveH, waveV, WAVE_N);
+		waveClock += dt;
+		for (; waveClock >= 1 / WAVE_RATE; waveClock -= 1 / WAVE_RATE) stepWaves(waveH, waveV, WAVE_N);
 
 		const host = heaviest();
 		const lost = (x, z, leash) => swallowed(x, z) || (x - host.x) ** 2 + (z - host.z) ** 2 > leash * leash;
@@ -1185,7 +1211,7 @@ const boot = () => {
 			gl.uniform1f(progs.glow.u.uGain, gain);
 			gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 		};
-		for (const b of bodies) if (b.kind === 'hole') glow(b, 3, 7, true, 1);
+		for (const b of bodies) if (b.kind === 'hole') glow(b, 3, 10, true, 1);
 
 		// The sheet is translucent, so it must not hide its own far side: no depth writes,
 		// and bands are drawn far to near so nearer slopes blend over farther ones.
@@ -1312,7 +1338,9 @@ const boot = () => {
 			const sx = (c[0] / c[3] * 0.5 + 0.5) * w;
 			const sy = (c[1] / c[3] * 0.5 + 0.5) * h;
 			const rPx = (R * view.pixels) / c[3];
-			const einstein = rPx * 2.4;
+			// With E = 2.04 R the lensed image of the black sphere ends at 2.6 R, the shadow edge,
+			// and the photon ring glow lands just outside it, at 2.89 R.
+			const einstein = rPx * 2.04;
 			lens.set([sx, sy, einstein * einstein, rPx], lensCount++ * 4);
 		}
 

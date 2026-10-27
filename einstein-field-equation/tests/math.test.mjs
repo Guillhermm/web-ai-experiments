@@ -10,7 +10,7 @@ vm.runInContext(readFileSync(new URL('../script.js', import.meta.url), 'utf8'), 
 const api = vm.runInContext(
 	`({ wellHeight, gravityAt, stepFade, MOON_FADE_IN, MOON_FADE_OUT, clampMass, farFieldLevel, KINDS, bounceInSquare, restingHeight, sheetDrawOrder, MESH_N, SHEET_BAND, circularSpeed, mergeBodies, stepWaves, sampleWave, perspective, lookAt,
 		multiply, invert, transform, rayFromNdc, raySphere, rayPlaneY, pickSurface, isTap, isDoubleTap,
-		TAP_MS, DOUBLE_TAP_MS, DEPTH, HALF, WAVE_N })`,
+		TAP_MS, DOUBLE_TAP_MS, DEPTH, HALF, WAVE_N, G, WELL_SCALE, HOLE_MERGER_LOSS })`,
 	ctx,
 );
 
@@ -25,11 +25,25 @@ test('well is deepest at the body and sums across bodies', () => {
 	close(api.wellHeight([a, b], 0, 0), api.wellHeight([a], 0, 0) + api.wellHeight([b], 0, 0));
 });
 
-test('a narrower softening makes a steeper well with the same depth', () => {
+test('every kind draws its well at one scale: compact bodies dig deeper, all look alike far away', () => {
 	const wide = star(0, 0, 1, 2.4);
-	const narrow = star(0, 0, 1, 1);
-	close(api.wellHeight([wide], 0, 0), api.wellHeight([narrow], 0, 0));
-	assert.ok(api.wellHeight([narrow], 2, 0) > api.wellHeight([wide], 2, 0));
+	const narrow = star(0, 0, 1, 1.25);
+	assert.ok(api.wellHeight([narrow], 0, 0) < api.wellHeight([wide], 0, 0));
+	close(api.wellHeight([narrow], 200, 0), api.wellHeight([wide], 200, 0), 1e-3);
+});
+
+test('the slope of the sheet is the pull, for every softening', () => {
+	const e = 1e-4;
+	for (const s of [2.4, 1.6, 1.25]) {
+		const b = star(1, -2, 1.7, s);
+		for (const [x, z] of [[4, 1], [-3, 0.5], [1.5, -2]]) {
+			const [ax, az] = api.gravityAt([b], x, z);
+			const gx = (api.wellHeight([b], x + e, z) - api.wellHeight([b], x - e, z)) / (2 * e);
+			const gz = (api.wellHeight([b], x, z + e) - api.wellHeight([b], x, z - e)) / (2 * e);
+			close(ax, -gx * (api.G / api.WELL_SCALE), 1e-4);
+			close(az, -gz * (api.G / api.WELL_SCALE), 1e-4);
+		}
+	}
 });
 
 test('gravity points toward the body and skips itself', () => {
@@ -60,6 +74,16 @@ test('merging conserves mass and momentum, and a black hole wins', () => {
 	close(m.x, 4 / 3);
 	assert.equal(m.kind, 'hole');
 	assert.equal(m.hue, a.hue);
+});
+
+test('two merging black holes radiate part of their mass, and the remnant moves with their center of mass', () => {
+	const a = { ...star(0, 0, 4), vx: 1, vz: 0, kind: 'hole', hue: [0, 0, 0] };
+	const b = { ...star(2, 0, 2), vx: -1, vz: 2, kind: 'hole', hue: [0, 0, 0] };
+	const m = api.mergeBodies(a, b);
+	close(m.mass, 6 * (1 - api.HOLE_MERGER_LOSS));
+	close(m.vx, (4 - 2) / 6);
+	close(m.vz, 4 / 6);
+	close(m.x, 4 / 6);
 });
 
 test('waves stay flat when flat and decay when disturbed', () => {

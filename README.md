@@ -13,7 +13,7 @@ No frameworks. No build tools. No dependencies.
 ## Experiments
 
 - **Curved Spacetime**  
-  An interactive embedding diagram of gravity in raw WebGL 2, where stars, planets and black holes bend a glowing grid, and dust and moons orbit along the curvature.  
+  An interactive rubber-sheet picture of gravity in raw WebGL 2, where stars, planets and black holes bend a glowing grid, and dust and moons orbit along the curvature.  
   **Path:** `einstein-field-equation/`
 
 ## Notes
