@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'">
+		<meta name="referrer" content="no-referrer">
+		<title>Curved Spacetime, by Guilherme Zeni</title>
+		<link rel="stylesheet" href="./styles.css">
+		<script src="./script.js" defer></script>
+	</head>
+	<body>
+		<canvas id="scene" class="scene" role="img" aria-label="A glowing grid of spacetime bending around stars, planets and black holes, with dust and moons orbiting along the curvature"></canvas>
+
+		<header class="caption">
+			<h1>Curved spacetime</h1>
+			<p class="lede">A visual sketch based on Einstein's field equations</p>
+			<p id="fallback" class="fallback" hidden>This needs a browser with WebGL 2.</p>
+		</header>
+
+		<footer id="hints" class="hints">
+			<span><b>Drag</b> a body to move or throw it</span>
+			<span class="for-mouse"><b>Scroll</b> on it to change its mass</span>
+			<span class="for-touch"><b>Pinch</b> on it to change its mass</span>
+			<span class="for-mouse"><b>Double-click</b> to add a planet or remove a body</span>
+			<span class="for-touch"><b>Double-tap</b> to add a planet or remove a body</span>
+			<span class="for-mouse"><b>Hold</b> or <b>Shift + double-click</b> for a black hole</span>
+			<span class="for-touch"><b>Hold</b> for a black hole</span>
+			<span class="for-mouse"><b>Drag</b> space to orbit, <b>scroll</b> to zoom</span>
+			<span class="for-touch"><b>Drag</b> space to orbit, <b>pinch</b> to zoom</span>
+		</footer>
+	</body>
+</html>

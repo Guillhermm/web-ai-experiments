@@ -1,4 +1,4 @@
-# AI Web Experiments
+# Web AI Experiments
 
 A collection of interactive web experiments built with AI assistance, in plain HTML, CSS, and JavaScript.
 
@@ -8,11 +8,13 @@ No frameworks. No build tools. No dependencies.
 
 ## Live Demos
 
-[Visit Hub Web Page](https://guillhermm.github.io/ai-web-experiments/) to see all experiments.
+[Visit Hub Web Page](https://guillhermm.github.io/web-ai-experiments/) to see all experiments.
 
 ## Experiments
 
-None yet.
+- **Curved Spacetime**  
+  An interactive embedding diagram of gravity in raw WebGL 2, where stars, planets and black holes bend a glowing grid, and dust and moons orbit along the curvature.  
+  **Path:** `einstein-field-equation/`
 
 ## Notes
 
