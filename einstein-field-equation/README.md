@@ -4,6 +4,8 @@ A rubber-sheet picture of gravity in raw WebGL 2: no libraries, no build step, n
 
 Open `index.html` in a browser that supports WebGL 2.
 
+**Live demo:** https://codepen.io/editor/guillhermm/pen/01a17f60-e154-7fb2-8556-83897d2b6d2d
+
 ![Curved Spacetime preview](preview.jpg)
 
 ## Screenshots
