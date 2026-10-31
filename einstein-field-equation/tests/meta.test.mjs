@@ -22,3 +22,9 @@ test("sitemap lists this page alone", async () => {
 	const locs = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
 	assert.deepEqual(locs, [base]);
 });
+
+test("tab icon is linked and the CSP lets it load", async () => {
+	assert.ok(html.includes('<link rel="icon" href="./icon.svg" type="image/svg+xml">'));
+	assert.match(html, /img-src 'self'/);
+	assert.match(await readFile(new URL("../icon.svg", import.meta.url), "utf8"), /^<svg /);
+});
