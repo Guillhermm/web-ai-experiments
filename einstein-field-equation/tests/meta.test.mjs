@@ -16,3 +16,9 @@ test("canonical, og:url and og:image are absolute and point at this page", () =>
 	assert.ok(html.includes(`property="og:url" content="${base}"`));
 	assert.ok(html.includes(`property="og:image" content="${base}preview.jpg"`));
 });
+
+test("sitemap lists this page alone", async () => {
+	const xml = await readFile(new URL("../sitemap.xml", import.meta.url), "utf8");
+	const locs = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
+	assert.deepEqual(locs, [base]);
+});
