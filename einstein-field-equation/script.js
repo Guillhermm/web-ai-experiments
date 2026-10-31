@@ -1591,6 +1591,8 @@ const boot = () => {
 
 	addEventListener('resize', () => resize());
 	resize();
+	// Pointer handlers ray-cast through the camera, and the pointer can move before the first frame.
+	updateCamera();
 
 	// Two-body start: star and planet around their shared center of mass.
 	const starMass = 1.2;
