@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'">
+		<meta name="referrer" content="no-referrer">
+		<title>The Riemann Hypothesis, Step by Step, by Guilherme Zeni</title>
+		<meta name="description" content="A staircase with one step per prime, rebuilt live from the zeros of the Riemann zeta function. Each zero adds a wave. The Riemann Hypothesis puts every zero on one line, which keeps every wave below √x. A slider moves one zero off the line to show the growth it rules out. Raw WebGL 2.">
+		<meta name="author" content="Guilherme Zeni">
+		<link rel="canonical" href="https://guillhermm.github.io/web-ai-experiments/riemann-hypothesis/">
+		<meta property="og:type" content="website">
+		<meta property="og:title" content="The Riemann Hypothesis, Step by Step">
+		<meta property="og:description" content="One step per prime, built from the zeros of the zeta function. Move one zero off the critical line and watch its wave outgrow the √x bound the Riemann Hypothesis promises.">
+		<meta property="og:url" content="https://guillhermm.github.io/web-ai-experiments/riemann-hypothesis/">
+		<meta property="og:image" content="https://guillhermm.github.io/web-ai-experiments/riemann-hypothesis/preview.jpg">
+		<meta property="og:image:width" content="800">
+		<meta property="og:image:height" content="600">
+		<meta property="og:image:alt" content="A dark spiral staircase around a glowing column, its risers lit gold at the primes">
+		<meta name="twitter:card" content="summary_large_image">
+		<link rel="icon" href="./icon.svg" type="image/svg+xml">
+		<link rel="stylesheet" href="./styles.css">
+		<script src="./zeros.js" defer></script>
+		<script src="./math.js" defer></script>
+		<script src="./script.js" defer></script>
+	</head>
+	<body>
+		<canvas id="scene" class="scene" role="img" aria-label="A spiral staircase around a glowing column, the critical line; its height is rebuilt from zeta zeros, and its risers light up at the prime numbers"></canvas>
+		<div id="labels" class="labels" aria-hidden="true">
+			<span id="column-label" class="scene-label column-label">critical line · Re = ½</span>
+			<span id="limit-label" class="scene-label limit-label"></span>
+		</div>
+
+		<header class="caption">
+			<div class="caption-head">
+				<h1>The Riemann Hypothesis</h1>
+				<button id="about-open" class="icon-button" type="button" aria-haspopup="dialog" aria-controls="about" aria-label="What am I looking at?">
+					<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="8.25"/><path d="M7.6 7.7a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1.1.9-1.1 1.6v.4"/><circle class="dot" cx="10" cy="14.4" r="0.9"/></svg>
+				</button>
+			</div>
+			<p class="subtitle">A staircase of primes, built from the zeros of ζ</p>
+			<div class="experiment">
+				<label for="beta">Zero off the line</label>
+				<output id="beta-value" for="beta">Re = ½</output>
+				<input id="beta" class="range" type="range" min="0.5" max="0.95" step="0.01" value="0.5">
+			</div>
+			<label class="switch">
+				<input id="ghost" type="checkbox" role="switch">
+				<svg class="eye" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/><path class="eye-slash" pathLength="1" d="M4 4l16 16"/></svg>
+				True count
+			</label>
+			<p id="fallback" class="fallback" hidden>This needs a browser with WebGL 2.</p>
+		</header>
+		<dialog id="about" class="about" aria-labelledby="about-title" tabindex="-1">
+			<div class="about-head">
+				<h2 id="about-title">What am I looking at?</h2>
+				<button id="about-x" class="icon-button" type="button" aria-label="Close">
+					<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9"/></svg>
+				</button>
+			</div>
+			<p class="about-lede">Each step is a prime. Riemann counted them exactly with waves, one for each zero of the zeta function. The hypothesis says every zero lies on the glowing line, so no wave outgrows √x.</p>
+			<p>π(x) counts the primes up to x. Riemann's explicit formula writes it exactly: a smooth curve plus one wave for each nontrivial zero ρ of the zeta function. The page uses the first 1000, all of which lie on the critical line.</p>
+			<p>With no zeros the staircase is a smooth ramp. Each zero adds a ripple, and with enough of them the ripples settle into one step per prime. A step glows gold once the zeros in use tell it apart from its neighbors; until then it stays silver. The label in front of the stairs says how far up that holds.</p>
+			<p>The column is the critical line, where a zero's real part is ½. Every zero checked so far lies on it, and the Riemann Hypothesis says they all do. A zero at real part β makes a wave about 2x<sup>β</sup>/(|ρ| ln x) tall. On the line that is a multiple of √x / ln x, and the hypothesis is equivalent to π(x) staying within about √x ln x of the smooth curve li(x). The Waves panel divides the newest zero's main wave by √x / ln x. On the line its width settles near 2/|ρ|.</p>
+			<p><b>Zero off the line</b> is a what-if. It moves the first zero to real part β. The zeros of ζ are mirrored across the line, so a partner appears at 1 − β. This mix is not the zero set of ζ, so the stairs drift from the true count. The panel shows what the hypothesis rules out: the pair's wave outgrows √x by a factor near x<sup>β − ½</sup>. If ζ really had such a zero, the formula would still count the primes exactly, but π(x) − li(x) would swing by about x<sup>β</sup>/(|ρ| ln x), which outgrows √x ln x as x grows.</p>
+			<p><b>True count</b> draws the exact π(x) as a faint band beside the stairs.</p>
+			<p class="for-touch">Drag to orbit, pinch to zoom.</p>
+			<button id="about-close" class="about-close" type="button">Close</button>
+		</dialog>
+
+		<button id="panel-toggle" class="panel-toggle" type="button" aria-controls="panel" aria-expanded="true">Waves</button>
+		<canvas id="panel" class="panel" role="img" aria-label="The wave added by the newest zero, divided by √x over ln x so that on the critical line it keeps a nearly steady width, with x running upward, and the 1000 zeros on the critical line, lit as they are used"></canvas>
+
+		<div class="controls">
+			<div class="transport" role="group" aria-label="Play the zeros">
+				<button id="back" class="round" type="button" aria-pressed="false" aria-label="Remove zeros">
+					<svg viewBox="0 0 24 24" aria-hidden="true"><path class="go" d="M17 5.5v13L6.5 12z"/><path class="pause" d="M7 5.5h3.5v13H7zM13.5 5.5H17v13h-3.5z"/></svg>
+				</button>
+				<button id="forward" class="round" type="button" aria-pressed="false" aria-label="Add zeros">
+					<svg viewBox="0 0 24 24" aria-hidden="true"><path class="go" d="M7 5.5v13L17.5 12z"/><path class="pause" d="M7 5.5h3.5v13H7zM13.5 5.5H17v13h-3.5z"/></svg>
+				</button>
+			</div>
+			<label class="zeros" for="zeros">
+				<span>Zeros</span>
+				<input id="zeros" class="range" type="range" min="0" max="1000" step="1" value="0">
+				<output id="zeros-value" for="zeros" class="value">0</output>
+			</label>
+			<div class="picker" role="group" aria-label="Range of x">
+				<span class="picker-label">x ≤</span>
+				<button id="range-lower" class="arrow" type="button" aria-label="Smaller range">
+					<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 6l-6 6 6 6"/></svg>
+				</button>
+				<div class="reel">
+					<div id="range-strip" class="strip">
+						<button type="button" data-range="25" aria-pressed="false">25</button>
+						<button type="button" data-range="50" aria-pressed="false">50</button>
+						<button type="button" data-range="100" aria-pressed="false">100</button>
+						<button type="button" data-range="200" aria-pressed="false">200</button>
+					</div>
+				</div>
+				<button id="range-higher" class="arrow" type="button" aria-label="Larger range">
+					<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.5 6l6 6-6 6"/></svg>
+				</button>
+			</div>
+		</div>
+
+		<footer id="hints" class="hints">
+			<span><b>Drag</b> to orbit</span>
+			<span class="for-mouse"><b>Scroll</b> to zoom</span>
+			<span class="for-touch"><b>Pinch</b> to zoom</span>
+			<span class="for-mouse"><b>Space</b> plays or pauses</span>
+		</footer>
+	</body>
+</html>
