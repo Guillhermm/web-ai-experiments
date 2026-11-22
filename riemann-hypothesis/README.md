@@ -8,6 +8,8 @@ libraries, no build step, no server.
 
 Open `index.html` in a browser that supports WebGL 2.
 
+**Live demo:** https://codepen.io/editor/guillhermm/pen/01a20601-9765-7cbf-9168-2be6337a9d91
+
 ![The Riemann Hypothesis preview](preview.jpg)
 
 The page explains what the hypothesis says and what the picture shows. It does not say whether the
