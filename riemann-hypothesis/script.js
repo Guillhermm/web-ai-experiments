@@ -1331,8 +1331,14 @@ const boot = () => {
 		document.body.classList.toggle('is-panel-closed', !open);
 	};
 	panelToggle.addEventListener('click', () => setPanelOpen(panelToggle.getAttribute('aria-expanded') !== 'true'));
+	const toolsToggle = document.getElementById('tools-toggle');
+	const setToolsOpen = (open) => {
+		toolsToggle.setAttribute('aria-expanded', String(open));
+		document.body.classList.toggle('is-tools-closed', !open);
+	};
+	toolsToggle.addEventListener('click', () => setToolsOpen(toolsToggle.getAttribute('aria-expanded') !== 'true'));
 	// A mouse click leaves focus on the button, and Space would then press it again instead of playing.
-	document.querySelectorAll('.controls button, #panel-toggle, #about-open').forEach((el) => {
+	document.querySelectorAll('.controls button, #panel-toggle, #tools-toggle, #about-open').forEach((el) => {
 		el.addEventListener('click', (e) => {
 			if (e.detail > 0) el.blur();
 		});
@@ -1353,6 +1359,8 @@ const boot = () => {
 	window.addEventListener('resize', resize);
 
 	setPanelOpen(!narrowScreen.matches);
+	setToolsOpen(!narrowScreen.matches);
+	requestAnimationFrame(() => document.body.classList.remove('is-loading'));
 	// The dialog takes focus itself and opens at the top; left alone, Chrome focuses Close and scrolls to the end.
 	document.getElementById('about-open').addEventListener('click', () => {
 		aboutDialog.showModal();

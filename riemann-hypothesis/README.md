@@ -17,6 +17,8 @@ hypothesis has been proved.
 
 - **The caption card**: the title, an italic serif subtitle, the "Zero off the line" slider
   and the "True count" eye toggle. It sits slightly faded and comes to full strength on hover or focus.
+  A sliders button beside the title folds the slider and the toggle away and back, open by default on a wide
+  screen and folded on a narrow one; it turns rose while a zero is off the line, so a folded what-if stays visible.
   The question-mark button beside the title opens a modal that starts with a short summary and then the longer explanation; it fades and
   rises in, and closes with the × at its top, its Close button, Escape or a click outside.
 - **The staircase**: a ribbon from radius 4 to 7, turning once every 50 units of x, at height
@@ -44,7 +46,8 @@ hypothesis has been proved.
   zeros, 747 for 1000). It is shown only while x_N falls inside the range. With 100 zeros on 0–200,
   every step below x_N passes the sharpness test and 8 of the 23 above it do.
 - **The side panel** (the "Waves" button opens and closes it with a fade and a short slide; it starts
-  closed on narrow screens):
+  closed on narrow screens, with nothing animating before the script sets that state, so a phone never sees
+  it open on load):
   - the main wave of the newest zero, −2 Re li(x^ρ), divided by √x / ln x, with x running upward.
     On the line its height is about 2/|ρ| at every x (to within a relative 1/(|ρ| ln x)), shown by the two dashed guides: that steady width is
     what the hypothesis buys. The terms from x^(1/n), n ≥ 2, are left out of this view;

@@ -28,3 +28,9 @@ test("tab icon is linked and the CSP lets it load", async () => {
 	assert.match(html, /img-src 'self'/);
 	assert.match(await readFile(new URL("../icon.svg", import.meta.url), "utf8"), /^<svg /);
 });
+
+test("the what-if controls collapse behind a toggle, and nothing animates before the script sets the start state", () => {
+	assert.match(html, /<button id="tools-toggle"[^>]*aria-controls="tools"[^>]*aria-expanded="true"/);
+	assert.match(html, /<div id="tools" class="tools">[\s\S]*id="beta"[\s\S]*id="ghost"/);
+	assert.ok(html.includes('<body class="is-loading">'));
+});

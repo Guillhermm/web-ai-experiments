@@ -24,7 +24,7 @@
 		<script src="./math.js" defer></script>
 		<script src="./script.js" defer></script>
 	</head>
-	<body>
+	<body class="is-loading">
 		<canvas id="scene" class="scene" role="img" aria-label="A spiral staircase around a glowing column, the critical line; its height is rebuilt from zeta zeros, and its risers light up at the prime numbers"></canvas>
 		<div id="labels" class="labels" aria-hidden="true">
 			<span id="column-label" class="scene-label column-label">critical line · Re = ½</span>
@@ -34,21 +34,28 @@
 		<header class="caption">
 			<div class="caption-head">
 				<h1>The Riemann Hypothesis</h1>
+				<button id="tools-toggle" class="icon-button tools-toggle" type="button" aria-controls="tools" aria-expanded="true" aria-label="What-if controls">
+					<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 6h13M3.5 14h13"/><circle class="knob" cx="7.5" cy="6" r="1.9"/><circle class="knob" cx="12.5" cy="14" r="1.9"/></svg>
+				</button>
 				<button id="about-open" class="icon-button" type="button" aria-haspopup="dialog" aria-controls="about" aria-label="What am I looking at?">
 					<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="8.25"/><path d="M7.6 7.7a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1.1.9-1.1 1.6v.4"/><circle class="dot" cx="10" cy="14.4" r="0.9"/></svg>
 				</button>
 			</div>
 			<p class="subtitle">A staircase of primes, built from the zeros of ζ</p>
-			<div class="experiment">
-				<label for="beta">Zero off the line</label>
-				<output id="beta-value" for="beta">Re = ½</output>
-				<input id="beta" class="range" type="range" min="0.5" max="0.95" step="0.01" value="0.5">
+			<div id="tools" class="tools">
+				<div class="tools-inner">
+					<div class="experiment">
+						<label for="beta">Zero off the line</label>
+						<output id="beta-value" for="beta">Re = ½</output>
+						<input id="beta" class="range" type="range" min="0.5" max="0.95" step="0.01" value="0.5">
+					</div>
+					<label class="switch">
+						<input id="ghost" type="checkbox" role="switch">
+						<svg class="eye" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/><path class="eye-slash" pathLength="1" d="M4 4l16 16"/></svg>
+						True count
+					</label>
+				</div>
 			</div>
-			<label class="switch">
-				<input id="ghost" type="checkbox" role="switch">
-				<svg class="eye" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/><path class="eye-slash" pathLength="1" d="M4 4l16 16"/></svg>
-				True count
-			</label>
 			<p id="fallback" class="fallback" hidden>This needs a browser with WebGL 2.</p>
 		</header>
 		<dialog id="about" class="about" aria-labelledby="about-title" tabindex="-1">
