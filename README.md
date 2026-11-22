@@ -24,6 +24,8 @@ No frameworks. No build tools. No dependencies.
 
 These projects are experimental by nature and are not intended as production-ready components.
 
+The hub links to each folder (`./name/`), never to `./name/index.html`, so the address bar shows the clean URL. `node --test tests/*.mjs` checks that and that every linked folder has a page.
+
 ## License
 
 MIT License - See [LICENSE](LICENSE) file for details.
