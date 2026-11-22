@@ -1,4 +1,4 @@
-# The Riemann Hypothesis, Step by Step
+# The Riemann Hypothesis
 
 A spiral staircase in raw WebGL 2 whose height at x is Riemann's explicit formula for π(x), the number
 of primes up to x. With no zeros of ζ it is a smooth helical ramp. Each zero added ripples the ramp,
@@ -8,7 +8,7 @@ libraries, no build step, no server.
 
 Open `index.html` in a browser that supports WebGL 2.
 
-![The Riemann Hypothesis, Step by Step preview](preview.jpg)
+![The Riemann Hypothesis preview](preview.jpg)
 
 The page explains what the hypothesis says and what the picture shows. It does not say whether the
 hypothesis has been proved.
