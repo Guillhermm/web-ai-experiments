@@ -34,3 +34,7 @@ test("the what-if controls collapse behind a toggle, and nothing animates before
 	assert.match(html, /<div id="tools" class="tools">[\s\S]*id="beta"[\s\S]*id="ghost"/);
 	assert.ok(html.includes('<body class="is-loading">'));
 });
+
+test("Search Console verification tag is present", () => {
+	assert.ok(html.includes('<meta name="google-site-verification" content="IMB4bqRBXLrR92ODWWzF0c8qv-83lzgZZW2WHXw-ZCA">'));
+});
