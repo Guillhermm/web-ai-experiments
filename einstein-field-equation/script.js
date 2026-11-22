@@ -350,6 +350,15 @@ const float FADE_END = ${FADE_END.toFixed(4)};
 const float SHADE_REF = ${SHADE_REF.toFixed(4)};
 `;
 
+// A NaN or Inf pixel would be smeared by the bloom into a large black octagon. isnan() and
+// isinf() are compiled away by some drivers (Direct3D under ANGLE, fast-math Metal); a range
+// test fails for NaN too and survives that.
+const GLSL_FINITE = `
+vec3 finite(vec3 c) {
+	return all(lessThan(abs(c), vec3(6.0e4))) ? c : vec3(0.0);
+}
+`;
+
 const GLSL_NOISE = `
 float hash13(vec3 p) {
 	p = fract(p * 0.1031);
@@ -428,12 +437,13 @@ void main() {
 	vec3 d = normalize(b.xyz / b.w - a.xyz / a.w);
 
 	vec3 bandN = normalize(vec3(0.35, 1.0, -0.25));
-	float band = exp(-pow(dot(d, bandN) * 2.2, 2.0));
+	float bd = dot(d, bandN) * 2.2;
+	float band = exp(-bd * bd);
 	float n1 = fbm(d * 3.0 + 3.1);
 	float n2 = fbm(d * 6.0 - 1.7);
 	float lanes = smoothstep(0.32, 0.62, fbm(d * 9.0 + 5.0));
 	vec3 neb = mix(vec3(0.03, 0.07, 0.20), vec3(0.26, 0.05, 0.24), smoothstep(0.35, 0.7, n2));
-	neb *= pow(n1, 2.6) * 1.1 * band * (0.35 + 0.65 * lanes);
+	neb *= pow(max(n1, 0.0), 2.6) * 1.1 * band * (0.35 + 0.65 * lanes);
 	neb += vec3(0.004, 0.006, 0.016) * (0.6 + 0.4 * d.y);
 
 	vec3 col = neb;
@@ -496,10 +506,13 @@ void main() {
 	float t = pow(clamp(-vWorld.y / SHADE_REF, 0.0, 1.0), 0.75);
 	vec3 pal = palette(t);
 
-	vec3 n = normalize(cross(dFdx(vWorld), dFdy(vWorld)));
+	// Parallel screen derivatives give a zero cross product, and normalize(0) is NaN.
+	vec3 c = cross(dFdx(vWorld), dFdy(vWorld));
+	float cc = dot(c, c);
+	vec3 n = cc > 1e-24 ? c * inversesqrt(cc) : vec3(0.0, 1.0, 0.0);
 	vec3 v = normalize(uEye - vWorld);
 	if (dot(n, v) < 0.0) n = -n;
-	float fres = pow(1.0 - max(dot(n, v), 0.0), 3.0);
+	float fres = pow(clamp(1.0 - dot(n, v), 0.0, 1.0), 3.0);
 
 	vec3 lit = vec3(0.0);
 	for (int i = 0; i < 4; i++) {
@@ -559,7 +572,9 @@ void main() {
 	vec3 n = (p - uCenter) / uRadius;
 	vec4 clip = uViewProj * vec4(p, 1.0);
 	gl_FragDepth = clip.z / clip.w * 0.5 + 0.5;
-	float mu = max(dot(n, -rd), 0.0);
+	// n is unit length only up to rounding, so mu can pass 1 at the center facing the camera,
+	// and pow(1 - mu, ...) of that negative base is NaN on some drivers.
+	float mu = clamp(dot(n, -rd), 0.0, 1.0);
 
 	vec3 col = vec3(0.0);
 	if (uKind == 0) {
@@ -605,7 +620,8 @@ void main() {
 		float halo = exp(-max(q - 1.0, 0.0) * 1.3);
 		col = vec3(1.0, 0.5, 0.18) * (halo * 1.3 + rays * exp(-max(q - 1.0, 0.0) * 0.6)) * fadeOut;
 	} else if (uKind == 2) {
-		float ring = exp(-pow((q - 1.45) * 5.0, 2.0));
+		float rq = (q - 1.45) * 5.0;
+		float ring = exp(-rq * rq);
 		col = (vec3(1.0, 0.72, 0.42) * ring * 3.5 + vec3(0.55, 0.3, 1.0) * exp(-max(q - 1.0, 0.0) * 1.2) * 0.25) * fadeOut;
 	} else {
 		// Radii are in units of the drawn horizon. The disk stops at the innermost stable
@@ -674,7 +690,7 @@ void main() {
 	outColor = vec4(uTint * vAlpha, 1.0);
 }`;
 
-const DOWN_FS = `${GLSL_HEAD}
+const DOWN_FS = `${GLSL_HEAD}${GLSL_FINITE}
 in vec2 vUv;
 uniform sampler2D uTex;
 uniform vec2 uTexel;
@@ -682,8 +698,7 @@ uniform int uPrefilter;
 uniform float uThreshold;
 out vec4 outColor;
 vec3 tap(vec2 uv) {
-	vec3 c = texture(uTex, uv).rgb;
-	if (any(isnan(c)) || any(isinf(c))) c = vec3(0.0);
+	vec3 c = finite(texture(uTex, uv).rgb);
 	if (uPrefilter == 1) {
 		float br = max(c.r, max(c.g, c.b));
 		float soft = clamp(br - uThreshold + 0.5, 0.0, 1.0);
@@ -720,7 +735,7 @@ void main() {
 // what sits at r - E^2 / r, the point-lens equation. Within the shadow radius, sqrt(27) / 2 = 2.6
 // horizon radii, the frame is black. The mask cannot tell what is in front of the hole, so it
 // hides that too.
-const COMPOSITE_FS = `${GLSL_HEAD}${GLSL_NOISE}
+const COMPOSITE_FS = `${GLSL_HEAD}${GLSL_NOISE}${GLSL_FINITE}
 in vec2 vUv;
 uniform sampler2D uScene;
 uniform sampler2D uBloom;
@@ -749,7 +764,7 @@ void main() {
 	vec2 cd = vUv - 0.5;
 	vec2 ca = cd * dot(cd, cd) * 0.006;
 	vec3 col = vec3(texture(uScene, uv + ca).r, texture(uScene, uv).g, texture(uScene, uv - ca).b);
-	col = (col + texture(uBloom, uv).rgb * uBloomGain) * shadow;
+	col = (finite(col) + finite(texture(uBloom, uv).rgb) * uBloomGain) * shadow;
 	col = aces(col * 1.05);
 	float vig = 1.0 - smoothstep(0.35, 1.15, length(cd * vec2(uRes.x / uRes.y, 1.0)) * 0.95);
 	col *= mix(0.5, 1.0, vig);

@@ -54,6 +54,11 @@ Open `index.html` in a browser that supports WebGL 2.
   brings no gain, the display is capping the frame rate (a phone in power saving, say), so the
   previous tier comes back and the scene stops adapting. Devices that keep up stay at full
   quality: 1.75× pixels, 4× MSAA, a 400 × 400 mesh.
+- **No NaN pixels**: the bloom spreads one NaN or infinite pixel into a large black octagon. The
+  shaders never take `pow` of a base that can go negative, the sheet normal falls back when its
+  screen derivatives are parallel, and the bloom input and the final composite drop any value
+  outside ±60000 with a range test, since some drivers (Direct3D under ANGLE on Windows) compile
+  `isnan` away.
 - **Sky**: procedural stars and a nebula band, fixed in the world so they turn with the camera.
 
 ## How accurate is it
@@ -102,7 +107,8 @@ The CPU math (potential and its match to gravity, circular orbits, merging, wave
 curved sheet, tap and double-tap detection, quality steps) is tested with Node's built-in runner, no install needed:
 
 ```sh
-node --test tests/math.test.mjs
+node --test tests/*.mjs
 ```
 
-Shaders and rendering are checked by eye; there is no automated visual test.
+`shaders.test.mjs` guards the shader sources against the patterns that produced NaN pixels. Rendering
+itself is checked by eye; there is no automated visual test.
