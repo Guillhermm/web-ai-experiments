@@ -18,3 +18,30 @@ test("every folder the hub links to has a page", async () => {
 		await access(new URL(`${link}index.html`, root));
 	}
 });
+
+const runHubScript = async (protocol, hrefs) => {
+	const { runInNewContext } = await import("node:vm");
+	const anchors = hrefs.map((href) => ({ href, getAttribute() { return this.href; }, setAttribute(_, v) { this.href = v; } }));
+	const document = {
+		location: { protocol },
+		querySelectorAll: (sel) => {
+			assert.equal(sel, 'a[href^="./"][href$="/"]');
+			return anchors.filter((a) => a.href.startsWith("./") && a.href.endsWith("/"));
+		},
+	};
+	runInNewContext(await readFile(new URL("hub.js", root), "utf8"), { document });
+	return anchors.map((a) => a.href);
+};
+
+test("opened from disk, folder links get index.html; external links are left alone", async () => {
+	assert.deepEqual(await runHubScript("file:", ["./calc/", "https://codepen.io/x/", "./a/b/"]), ["./calc/index.html", "https://codepen.io/x/", "./a/b/index.html"]);
+});
+
+test("served over http, links stay clean", async () => {
+	assert.deepEqual(await runHubScript("https:", ["./calc/"]), ["./calc/"]);
+});
+
+test("hub loads its script under a CSP that only allows its own scripts", () => {
+	assert.ok(hub.includes('<script src="hub.js" defer></script>'));
+	assert.match(hub, /<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self';[^"]*">/);
+});

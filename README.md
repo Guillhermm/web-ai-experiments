@@ -24,7 +24,7 @@ No frameworks. No build tools. No dependencies.
 
 These projects are experimental by nature and are not intended as production-ready components.
 
-The hub links to each folder (`./name/`), never to `./name/index.html`, so the address bar shows the clean URL. `node --test tests/*.mjs` checks that and that every linked folder has a page.
+The hub links to each folder (`./name/`), never to `./name/index.html`, so the address bar shows the clean URL. `node --test tests/*.mjs` checks that and that every linked folder has a page. Opened straight from disk (`file://`), where no server turns a folder into its `index.html`, `hub.js` points those links at `index.html`. The hub runs under a Content Security Policy (CSP) that allows only its own script, its own styles and images, and Google Fonts.
 
 ## License
 
